@@ -28,6 +28,39 @@
             width: 100%;
             border: 2px solid #ccc;
         }
+        .info-popup h2 {
+            margin: 0 0 5px;
+            color: #333;
+            font-size: 16px;
+        }
+        .info-popup p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .info.legend {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .info.legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        .info.legend .legend-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .info.legend .legend-item {
+            clear: both;
+            margin-bottom: 3px;
+        }
     </style>
 </head>
 <body>
@@ -43,8 +76,68 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
+        // Create the legend control
+        const legend = L.control({position: 'bottomright'});
+
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            const grades = [0, 0.2, 0.4, 0.6, 0.8];
+            
+            // Add legend title
+            div.innerHTML = '<div class="legend-title">Vulnerability Score</div>';
+            
+            // Add colored boxes for each range
+            for (let i = 0; i < grades.length; i++) {
+                const from = grades[i];
+                const to = grades[i + 1];
+                
+                div.innerHTML += `
+                    <div class="legend-item">
+                        <i style="background:${getColor(from + 0.01)}"></i>
+                        ${from}${to ? '&ndash;' + to : '+'}</div>
+                `;
+            }
+            
+            // Add entry for missing data
+            div.innerHTML += `
+                <div class="legend-item">
+                    <i style="background:#808080"></i>
+                    No data</div>
+            `;
+            
+            return div;
+        };
+
         // Define global variable to store vulnerability data
         let vulnerabilityData = [];
+
+        // Function to get vulnerability score for a given GeoJSON feature
+        function getVulnerabilityScore(feature) {
+            // Extract the last 5 characters from GEO_ID to get FIPS code
+            const fipsCode = feature.properties.GEO_ID.slice(-5);
+            
+            // Find matching entry in vulnerabilityData
+            const matchingCounty = vulnerabilityData.find(county => 
+                county.CountyFIPS === fipsCode
+            );
+            
+            // Return the vulnerability score if found, or -1 if not found
+            return matchingCounty ? 
+                parseFloat(matchingCounty['Overall SDOH Vulnerability Score']) : -1;
+        }
+
+        // Function to determine color based on vulnerability score
+        function getColor(score) {
+            // Return gray for missing data
+            if (score === -1) return '#808080';
+            
+            // Color scale from green (low vulnerability) to red (high vulnerability)
+            if (score > 0.8) return '#d73027';      // Red for highest vulnerability
+            else if (score > 0.6) return '#fc8d59'; // Orange-red for high vulnerability
+            else if (score > 0.4) return '#fee08b'; // Yellow for medium vulnerability
+            else if (score > 0.2) return '#d9ef8b'; // Light green for low vulnerability
+            else return '#91cf60';                  // Green for lowest vulnerability
+        }
 
         // Define path to CSV file
         const csvFilePath = 'County_SDOH_Vulnerability_Scores.csv';
@@ -62,7 +155,7 @@
                 console.log('Vulnerability data loaded:', vulnerabilityData);
 
                 // Define path to GeoJSON file
-                const geoJsonFilePath = 'data/us_counties.geojson';
+                const geoJsonFilePath = 'us_counties.geojson';
 
                 // Load the GeoJSON file
                 fetch(geoJsonFilePath)
@@ -70,6 +163,67 @@
                     .then(geojsonData => {
                         // Log the data to verify it loaded correctly
                         console.log('County GeoJSON loaded:', geojsonData);
+
+                        // Function to style each feature
+                        function styleFeature(feature) {
+                            const score = getVulnerabilityScore(feature);
+                            return {
+                                fillColor: getColor(score),
+                                weight: 1,
+                                opacity: 1,
+                                color: 'white',
+                                dashArray: '',
+                                fillOpacity: 0.7
+                            };
+                        }
+
+                        // Function to handle mouseover event
+                        function highlightFeature(e) {
+                            const layer = e.target;
+                            layer.setStyle({
+                                weight: 2,
+                                color: '#666',
+                                dashArray: '',
+                                fillOpacity: 0.9
+                            });
+                            layer.bringToFront();
+                        }
+
+                        // Function to handle mouseout event
+                        function resetHighlight(e) {
+                            geojsonLayer.resetStyle(e.target);
+                        }
+
+                        // Function to handle each feature
+                        function onEachFeature(feature, layer) {
+                            const score = getVulnerabilityScore(feature);
+                            const countyName = feature.properties.NAME;
+                            
+                            if (countyName) {
+                                const popupContent = `
+                                    <div class="info-popup">
+                                        <h2>${countyName} County</h2>
+                                        <p>Overall SDOH Vulnerability Score: ${score === -1 ? 'No data' : score.toFixed(3)}</p>
+                                    </div>
+                                `;
+                                layer.bindPopup(popupContent);
+                            }
+
+                            // Add hover event handlers
+                            layer.on({
+                                mouseover: highlightFeature,
+                                mouseout: resetHighlight
+                            });
+                        }
+
+                        // Add the GeoJSON layer to the map with styling and interaction
+                        const geojsonLayer = L.geoJSON(geojsonData, {
+                            style: styleFeature,
+                            onEachFeature: onEachFeature
+                        }).addTo(map);
+
+                        // Add the legend to the map
+                        legend.addTo(map);
                     })
                     .catch(error => {
                         console.error('Error loading GeoJSON:', error);
