@@ -12,7 +12,6 @@
     
     <!-- PapaParse Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -113,18 +112,25 @@
 
         // Function to get vulnerability score for a given GeoJSON feature
         function getVulnerabilityScore(feature) {
-            // Extract the last 5 characters from GEO_ID to get FIPS code
-            const fipsCode = feature.properties.GEO_ID.slice(-5);
-            
+            // Extract the last 5 characters from GEO_ID to get FIPS code from GeoJSON
+            const geoJsonFips = feature.properties.GEO_ID.slice(-5);
+
             // Find matching entry in vulnerabilityData
-            const matchingCounty = vulnerabilityData.find(county => 
-                county.CountyFIPS === fipsCode
-            );
-            
-            // Return the vulnerability score if found, or -1 if not found
-            return matchingCounty ? 
-                parseFloat(matchingCounty['Overall SDOH Vulnerability Score']) : -1;
-        }
+            const matchingCounty = vulnerabilityData.find(county => {
+            // Get CSV FIPS. Ensure it's treated as a string.
+            const csvFips = String(county.CountyFIPS);
+
+            // Pad CSV FIPS with leading zeros if it's less than 5 digits
+            const paddedCsvFips = csvFips.padStart(5, '0');
+
+            // Compare the padded CSV FIPS with the GeoJSON FIPS
+            return paddedCsvFips === geoJsonFips;
+    });
+
+    // Return the vulnerability score if found, or -1 if not found
+    return matchingCounty ?
+        parseFloat(matchingCounty['Overall SDOH Vulnerability Score']) : -1;
+}
 
         // Function to determine color based on vulnerability score
         function getColor(score) {
