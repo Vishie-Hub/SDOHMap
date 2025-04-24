@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>County Health Vulnerability Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- PapaParse Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha512-dfHqKw3+6LdzEjPqsPgK+2gGzkMhXUgSDqrKnoL9fM/o9paJSEmCvcf+B/kR/H6Nf9v9f+sXv/X8F//Fhrw3NQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+            border: 2px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map centered on the United States
+        const map = L.map('map').setView([39.8283, -98.5795], 4);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Define global variable to store vulnerability data
+        let vulnerabilityData = [];
+
+        // Define path to CSV file
+        const csvFilePath = 'County_SDOH_Vulnerability_Scores.csv';
+
+        // Parse CSV file using PapaParse
+        Papa.parse(csvFilePath, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                // Store the parsed data in our global variable
+                vulnerabilityData = results.data;
+                
+                // Log the data to verify it loaded correctly
+                console.log('Vulnerability data loaded:', vulnerabilityData);
+
+                // Define path to GeoJSON file
+                const geoJsonFilePath = 'data/us_counties.geojson';
+
+                // Load the GeoJSON file
+                fetch(geoJsonFilePath)
+                    .then(response => response.json())
+                    .then(geojsonData => {
+                        // Log the data to verify it loaded correctly
+                        console.log('County GeoJSON loaded:', geojsonData);
+                    })
+                    .catch(error => {
+                        console.error('Error loading GeoJSON:', error);
+                    });
+            },
+            error: function(error) {
+                console.error('Error parsing CSV:', error);
+            }
+        });
+    </script>
+</body>
+</html> 
